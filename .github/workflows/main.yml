@@ -43,7 +43,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pip install -U "huggingface_hub[cli]"
-          huggingface-cli login --token $HF_TOKEN
-          # داتاکە ڕاستەوخۆ بەرز دەکاتەوە بۆ ناو ڕیپۆزیتۆری Ai_SMART
-          huggingface-cli upload Sarko717227/Ai_SMART output/${{ github.event.inputs.folder_name }} /${{ github.event.inputs.folder_name }} --repo-type dataset
+          pip install huggingface_hub
+          python -c "import os; from huggingface_hub import HfApi; api = HfApi(token=os.environ['HF_TOKEN']); api.upload_folder(folder_path='output/${{ github.event.inputs.folder_name }}', repo_id='Sarko717227/Ai_SMART', repo_type='dataset', path_in_repo='${{ github.event.inputs.folder_name }}')"
