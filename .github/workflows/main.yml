@@ -21,14 +21,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Download Video
-        # لێرەدا کێشەکەمان چارەسەر کرد و دەیکەین بە ts بۆ ئەوەی بیناسێتەوە
         run: wget -O input.ts "${{ github.event.inputs.video_url }}"
 
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          # خوێندنەوەی ڤیدیۆ ts-ەکە و پارچەکردنی بە خێرایی
-          ffmpeg -i input.ts -map 0:v:0 -map 0:a? -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
+          # -f mpegts ناچاری دەکات تەنها ستریمی ڤیدیۆکە بخوێنێتەوە و وێنەی کەڤەرەکە فڕێ بدات
+          ffmpeg -f mpegts -i input.ts -map 0:v:0 -map 0:a? -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
         run: |
