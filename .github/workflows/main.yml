@@ -1,0 +1,49 @@
+name: SEBAR Tv - Video to HLS
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'لینکی ڕاستەوخۆی ڤیدیۆکە (بۆ نموونە .mp4)'
+        required: true
+      folder_name:
+        description: 'ناوی ئەو فۆڵدەرەی لەناو Hugging Face دروست دەبێت (بۆ نموونە movie1)'
+        required: true
+
+jobs:
+  convert_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Download Video
+        run: wget -O input.mp4 "${{ github.event.inputs.video_url }}"
+
+      - name: Create HLS Chunks
+        run: |
+          mkdir -p output/${{ github.event.inputs.folder_name }}
+          # ڤیدیۆکە دەکاتە پارچەی ١٠ چرکەیی
+          ffmpeg -i input.mp4 -codec: copy -start_number 0 -hls_time 10 -hls_list_size 0 -f hls output/${{ github.event.inputs.folder_name }}/index.m3u8
+
+      - name: Rename Extensions to .safetensors
+        run: |
+          cd output/${{ github.event.inputs.folder_name }}
+          # گۆڕینی پاشگری پارچەکان
+          for f in *.ts; do mv "$f" "${f%.ts}.safetensors"; done
+          # گۆڕینی ناوی فایلی ڕێنیشاندەرەکە
+          mv index.m3u8 index.safetensors
+          # گۆڕینی ناوەڕۆکی فایلەکە
+          sed -i 's/\.ts/\.safetensors/g' index.safetensors
+
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install -U "huggingface_hub[cli]"
+          huggingface-cli login --token $HF_TOKEN
+          # داتاکە ڕاستەوخۆ بەرز دەکاتەوە بۆ ناو ڕیپۆزیتۆری Ai_SMART
+          huggingface-cli upload Sarko717227/Ai_SMART output/${{ github.event.inputs.folder_name }} /${{ github.event.inputs.folder_name }} --repo-type dataset
