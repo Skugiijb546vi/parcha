@@ -21,13 +21,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Download Video
-        # لێرەدا curl مان بەکارهێنا لەبری wget بۆ ئەوەی بەهێزتر بێت
-        run: curl -L -o input.mp4 "${{ github.event.inputs.video_url }}"
+        # گەڕانەوە بۆ wget چونکە سەدا سەد کار دەکات لەگەڵ Hugging Face
+        run: wget -O input.mp4 "${{ github.event.inputs.video_url }}"
 
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          # جادوەکە لێرەدایە: بەکارهێنانی V ی گەورە و فیلتەری scale
+          # بڕەرە بەهێزەکە کە کێشەی وێنە و ڕەنگەکان چارەسەر دەکات
           ffmpeg -i input.mp4 -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a copy -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
