@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'لینکی ڕاستەوخۆی ڤیدیۆکە (بۆ نموونە .mp4)'
+        description: 'لینکی ڕاستەوخۆی ڤیدیۆکە'
         required: true
       folder_name:
-        description: 'ناوی ئەو فۆڵدەرەی لەناو Hugging Face دروست دەبێت (بۆ نموونە movie1)'
+        description: 'ناوی فۆڵدەر (تەنها ئینگلیزی و بێ بۆشایی)'
         required: true
 
 jobs:
@@ -26,8 +26,8 @@ jobs:
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          # ڤیدیۆکە ڕێندەر دەکاتەوە بە خێرایی و بە زۆر دەیکاتە پارچەی 10 چرکەیی ڕێک
-          ffmpeg -i input.mp4 -c:v libx264 -preset veryfast -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -f hls output/${{ github.event.inputs.folder_name }}/index.m3u8
+          # ئەمە کۆدە بەهێزەکەیە کە کێشەی ڕەنگ و ستریمە زیادەکانی تێدا چارەسەر کراوە
+          ffmpeg -i input.mp4 -map 0:v:0 -map 0:a? -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a copy -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
         run: |
