@@ -18,17 +18,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install FFmpeg
-        run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Download Video
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           URL="${{ github.event.inputs.video_url }}"
-          # لێرەدا کۆدەکە بڕیار دەدات چۆن ڤیدیۆکە داونلۆد بکات
           if [[ "$URL" == *".m3u8"* ]]; then
-            echo "M3U8 link detected! Downloading stream..."
             ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -i "$URL" -c copy input_video.ts
             mv input_video.ts input_video
           else
