@@ -7,7 +7,7 @@ on:
         description: 'Direct Video URL'
         required: true
       folder_name:
-        description: 'Folder Name (English only)'
+        description: 'Folder Name English'
         required: true
 
 jobs:
