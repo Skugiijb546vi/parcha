@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'Direct Video URL'
+        description: 'Direct Video URL or M3U8'
         required: true
       folder_name:
         description: 'Folder Name English'
@@ -25,7 +25,15 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          wget --header="Authorization: Bearer $HF_TOKEN" -O input_video "${{ github.event.inputs.video_url }}"
+          URL="${{ github.event.inputs.video_url }}"
+          # لێرەدا کۆدەکە بڕیار دەدات چۆن ڤیدیۆکە داونلۆد بکات
+          if [[ "$URL" == *".m3u8"* ]]; then
+            echo "M3U8 link detected! Downloading stream..."
+            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -i "$URL" -c copy input_video.ts
+            mv input_video.ts input_video
+          else
+            wget --header="Authorization: Bearer $HF_TOKEN" -O input_video "$URL"
+          fi
 
       - name: Create HLS Chunks
         run: |
