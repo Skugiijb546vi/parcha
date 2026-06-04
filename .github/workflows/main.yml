@@ -21,7 +21,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Download Video
-        # چارەسەری ئیرۆری 429: ناردنی کلیلی نهێنی لە کاتی داونلۆددا
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: wget --header="Authorization: Bearer $HF_TOKEN" -O input_video "${{ github.event.inputs.video_url }}"
