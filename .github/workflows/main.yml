@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'لینکی ڕاستەوخۆی ڤیدیۆکە'
+        description: 'Direct Video URL'
         required: true
       folder_name:
-        description: 'ناوی فۆڵدەر (تەنها ئینگلیزی و بێ بۆشایی)'
+        description: 'Folder Name (English only)'
         required: true
 
 jobs:
