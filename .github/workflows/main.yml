@@ -26,10 +26,11 @@ jobs:
         run: |
           URL="${{ github.event.inputs.video_url }}"
           if [[ "$URL" == *".m3u8"* ]]; then
-            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -i "$URL" -c copy input_video.ts
+            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -i "$URL" -c copy input_video.ts
             mv input_video.ts input_video
           else
-            wget --header="Authorization: Bearer $HF_TOKEN" -O input_video "$URL"
+            # جادوەکە لێرەدایە: خۆمان وەک گۆگڵ کرۆم پیشان دەدەین
+            wget --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --header="Authorization: Bearer $HF_TOKEN" -O input_video "$URL"
           fi
 
       - name: Create HLS Chunks
