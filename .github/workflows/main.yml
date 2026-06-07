@@ -34,18 +34,16 @@ jobs:
           
           if [[ "$URL" == *"huggingface.co"* ]]; then
             pip install huggingface_hub
-            cat << 'EOF' > dl.py
-          import os, sys
-          from huggingface_hub import hf_hub_download
-          u = sys.argv[1]
-          p = u.split('/')
-          t = 'dataset' if 'datasets' in p else 'model'
-          r = p[4] + '/' + p[5]
-          m = p.index('main')
-          f = '/'.join(p[m+1:]).replace('%20', ' ')
-          d = hf_hub_download(repo_id=r, filename=f, repo_type=t, token=os.environ['HF_TOKEN'], local_dir='.')
-          os.rename(d, 'input.video')
-          EOF
+            echo "import os, sys" > dl.py
+            echo "from huggingface_hub import hf_hub_download" >> dl.py
+            echo "u = sys.argv[1]" >> dl.py
+            echo "p = u.split('/')" >> dl.py
+            echo "t = 'dataset' if 'datasets' in p else 'model'" >> dl.py
+            echo "r = p[4] + '/' + p[5]" >> dl.py
+            echo "m = p.index('main')" >> dl.py
+            echo "f = '/'.join(p[m+1:]).replace('%20', ' ')" >> dl.py
+            echo "d = hf_hub_download(repo_id=r, filename=f, repo_type=t, token=os.environ['HF_TOKEN'], local_dir='.')" >> dl.py
+            echo "os.rename(d, 'input.video')" >> dl.py
             python3 dl.py "$URL"
           elif [[ "$URL" == *".m3u8"* ]]; then
             ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.video
@@ -74,5 +72,15 @@ jobs:
           ls -lh output/${FOLDER_NAME} | head -n 10
           
           echo "🚀 Uploading to Hugging Face..."
-          pip install -U "huggingface_hub[cli]"
-          huggingface-cli upload Sarko717227/Ai_SMART output/${FOLDER_NAME} ${FOLDER_NAME} --repo-type dataset --token $HF_TOKEN
+          pip install -U huggingface_hub
+          
+          # دروستکردنی فایلی ئەپڵۆدکردن بەبێ کێشەی بۆشایی و بێ بەکارهێنانی فەرمانی کۆن
+          echo "import os" > up.py
+          echo "from huggingface_hub import HfApi" >> up.py
+          echo "api = HfApi(token=os.environ['HF_TOKEN'])" >> up.py
+          echo "folder = os.environ['FOLDER_NAME']" >> up.py
+          echo "print('Uploading files, please wait...')" >> up.py
+          echo "api.upload_folder(folder_path=f'output/{folder}', repo_id='Sarko717227/Ai_SMART', repo_type='dataset', path_in_repo=folder)" >> up.py
+          
+          python3 up.py
+          echo "✅ هەموو شتێک بە سەرکەوتوویی کۆتایی هات!"
