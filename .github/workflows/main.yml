@@ -25,39 +25,52 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           URL="${{ github.event.inputs.video_url }}"
-          echo "Target URL: $URL"
+          ENCODED_URL=$(echo "$URL" | sed 's/ /%20/g')
+          echo "Target URL: $ENCODED_URL"
           
-          if [[ "$URL" == *".m3u8"* ]]; then
+          if [[ "$ENCODED_URL" == *"huggingface.co"* ]]; then
+            echo "Hugging Face Link Detected! Using official downloader to bypass LFS issues..."
+            pip install huggingface_hub
+            
+            # بەکارهێنانی پایتۆن بۆ ڕاکێشانی فیلمە ئەسڵییەکە بە دروستی
+            python -c "
+          import os
+          from huggingface_hub import hf_hub_download
+          
+          url = '$ENCODED_URL'
+          parts = url.split('/')
+          
+          repo_type = 'dataset' if 'datasets' in parts else 'model'
+          repo_id = parts[4] + '/' + parts[5]
+          main_idx = parts.index('main')
+          filename = '/'.join(parts[main_idx+1:])
+          filename = filename.replace('%20', ' ')
+          
+          print(f'Downloading: {filename} from {repo_id}')
+          download_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type, token=os.environ['HF_TOKEN'], local_dir='.')
+          
+          os.rename(download_path, 'input.mp4')
+          "
+          elif [[ "$ENCODED_URL" == *".m3u8"* ]]; then
             echo "Downloading M3U8 stream..."
-            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -i "$URL" -c copy input.mp4
+            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -i "$ENCODED_URL" -c copy input.mp4
           else
             echo "Downloading Direct URL..."
-            # بەکارهێنانی curl لەبری wget بۆ بەهێزترکردنی پڕۆسەی ڕاکێشانی فایلەکان
-            curl -L -f -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-                 -H "Authorization: Bearer $HF_TOKEN" \
-                 -H "Referer: $URL" \
-                 -o input.mp4 "$URL"
-            
-            # پشکنین: دڵنیابوونەوە لەوەی فایلەکە بە تەواوی دابەزیوە
-            if [ ! -f "input.mp4" ]; then
-              echo "Error: Download failed entirely."
-              exit 1
-            fi
-            
-            # پشکنین: ئەگەر قەبارەی فایلەکە لە 1 مێگابایت کەمتر بوو، واتە لینکەکە بلۆک کراوە
-            FILE_SIZE=$(stat -c%s "input.mp4")
-            if [ "$FILE_SIZE" -lt 1048576 ]; then
-              echo "Error: Downloaded file is too small ($FILE_SIZE bytes). The CDN likely blocked the request or the link is expired/invalid."
-              cat input.mp4
-              exit 1
-            fi
-            echo "Download successful! Size: $FILE_SIZE bytes."
+            curl -L -f -A "Mozilla/5.0" -H "Authorization: Bearer $HF_TOKEN" -o input.mp4 "$ENCODED_URL"
+          fi
+          
+          # پشکنینی قەبارە بۆ ئەوەی دڵنیابین فیلمەکە هاتووە نەک فایلێکی بەتاڵ
+          FILE_SIZE=$(stat -c%s "input.mp4")
+          echo "Downloaded File Size: $FILE_SIZE bytes"
+          if [ "$FILE_SIZE" -lt 1048576 ]; then
+            echo "Error: File is too small! The real video was not downloaded."
+            cat input.mp4
+            exit 1
           fi
 
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          # ئێستا ڕاستەوخۆ مامەڵە لەگەڵ input.mp4 دەکات
           ffmpeg -i input.mp4 -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
