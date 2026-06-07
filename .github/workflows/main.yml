@@ -56,8 +56,8 @@ jobs:
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          # لێرەدا کێشەکەمان چارەسەر کرد: پێی دەڵێین بە قووڵی بیپشکنە پێش کۆنڤێرتکردن
-          ffmpeg -probesize 100M -analyzeduration 100M -i input.ts -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
+          # لێرەدا بە زەبری هێز (-f mpegts) پێی دەڵێین کە ئەمە ڤیدیۆیە نەک وێنە
+          ffmpeg -f mpegts -i input.ts -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
         run: |
