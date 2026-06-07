@@ -28,7 +28,6 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Tools
-        # لێرەدا بەرنامەی aria2 مان زیاد کردووە
         run: sudo apt-get update && sudo apt-get install -y ffmpeg aria2
 
       - name: Download Video
@@ -50,25 +49,26 @@ jobs:
           m = p.index('main')
           f = '/'.join(p[m+1:]).replace('%20', ' ')
           d = hf_hub_download(repo_id=r, filename=f, repo_type=t, token=os.environ['HF_TOKEN'], local_dir='.')
-          os.rename(d, 'input.ts')
+          os.rename(d, 'input.video')
           EOF
             python3 dl.py "$URL"
           elif [[ "$URL" == *".m3u8"* ]]; then
-            ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.ts
+            ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.video
           else
-            # جادوەکەی aria2 لێرەدایە کە ١٦ هێڵ لە یەک کاتدا دەکاتەوە
-            aria2c -x 16 -s 16 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.ts "$URL"
+            aria2c -x 4 -s 4 --max-connection-per-server=4 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
           fi
           
-          SIZE=$(stat -c%s "input.ts" 2>/dev/null || echo 0)
+          SIZE=$(stat -c%s "input.video" 2>/dev/null || echo 0)
           if [ "$SIZE" -lt 5000000 ]; then
+            echo "Error: Downloaded file is too small."
             exit 1
           fi
 
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          ffmpeg -f mpegts -i input.ts -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
+          # لێرەدا فەرمانە زۆرەملێیەکەمان لابرد بۆ ئەوەی mp4 بە ئاسانی بخوێنێتەوە
+          ffmpeg -probesize 100M -analyzeduration 100M -i input.video -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
         run: |
@@ -88,6 +88,4 @@ jobs:
           from huggingface_hub import HfApi
           api = HfApi(token=os.environ['HF_TOKEN'])
           folder = os.environ['FOLDER_NAME']
-          api.upload_folder(folder_path=f'output/{folder}', repo_id='Sarko717227/Ai_SMART', repo_type='dataset', path_in_repo=folder)
-          EOF
-          python3 up.py
+          api.upload_folder(folder_path=f'output/{folder}', repo_id='Sarko7172
