@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'Direct Video URL or M3U8'
+        description: 'Direct Video URL or M3U8 (Full Movie)'
         required: true
       folder_name:
         description: 'Folder Name English'
@@ -25,53 +25,60 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           URL="${{ github.event.inputs.video_url }}"
-          ENCODED_URL=$(echo "$URL" | sed 's/ /%20/g')
-          echo "Target URL: $ENCODED_URL"
+          URL=$(echo "$URL" | sed 's/ /%20/g')
           
-          if [[ "$ENCODED_URL" == *"huggingface.co"* ]]; then
-            echo "Hugging Face Link Detected! Using official downloader to bypass LFS issues..."
+          echo "Starting download..."
+          
+          if [[ "$URL" == *"huggingface.co"* ]]; then
+            echo "Hugging Face link detected!"
             pip install huggingface_hub
             
-            # بەکارهێنانی پایتۆن بۆ ڕاکێشانی فیلمە ئەسڵییەکە بە دروستی
-            python -c "
-          import os
-          from huggingface_hub import hf_hub_download
-          
-          url = '$ENCODED_URL'
-          parts = url.split('/')
-          
-          repo_type = 'dataset' if 'datasets' in parts else 'model'
-          repo_id = parts[4] + '/' + parts[5]
-          main_idx = parts.index('main')
-          filename = '/'.join(parts[main_idx+1:])
-          filename = filename.replace('%20', ' ')
-          
-          print(f'Downloading: {filename} from {repo_id}')
-          download_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type, token=os.environ['HF_TOKEN'], local_dir='.')
-          
-          os.rename(download_path, 'input.mp4')
-          "
-          elif [[ "$ENCODED_URL" == *".m3u8"* ]]; then
-            echo "Downloading M3U8 stream..."
-            ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -i "$ENCODED_URL" -c copy input.mp4
+            # دروستکردنی فایلی پایتۆن بە سەربەخۆیی بۆ ڕێگریکردن لە کێشەی سینتاکس
+            cat << 'EOF' > download_script.py
+import os
+import sys
+from huggingface_hub import hf_hub_download
+
+url = sys.argv[1]
+parts = url.split('/')
+
+repo_type = 'dataset' if 'datasets' in parts else 'model'
+repo_id = parts[4] + '/' + parts[5]
+main_idx = parts.index('main')
+filename = '/'.join(parts[main_idx+1:])
+filename = filename.replace('%20', ' ')
+
+print(f'Downloading: {filename} from {repo_id}')
+download_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type, token=os.environ['HF_TOKEN'], local_dir='.')
+
+# گۆڕینی ناوەکە بۆ ts بۆ ئەوەی FFmpeg بێ کێشە بیخوێنێتەوە
+os.rename(download_path, 'input.ts')
+EOF
+            python3 download_script.py "$URL"
+            
+          elif [[ "$URL" == *".m3u8"* ]]; then
+            echo "M3U8 link detected!"
+            ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.ts
           else
-            echo "Downloading Direct URL..."
-            curl -L -f -A "Mozilla/5.0" -H "Authorization: Bearer $HF_TOKEN" -o input.mp4 "$ENCODED_URL"
+            echo "Direct link detected!"
+            curl -L -A "Mozilla/5.0" -H "Authorization: Bearer $HF_TOKEN" -o input.ts "$URL"
           fi
           
-          # پشکنینی قەبارە بۆ ئەوەی دڵنیابین فیلمەکە هاتووە نەک فایلێکی بەتاڵ
-          FILE_SIZE=$(stat -c%s "input.mp4")
+          # پشکنینی قەبارە
+          FILE_SIZE=$(stat -c%s "input.ts" 2>/dev/null || echo 0)
           echo "Downloaded File Size: $FILE_SIZE bytes"
-          if [ "$FILE_SIZE" -lt 1048576 ]; then
-            echo "Error: File is too small! The real video was not downloaded."
-            cat input.mp4
+          
+          if [ "$FILE_SIZE" -lt 5000000 ]; then
+            echo "❌ Error: File is too small! The real video was not downloaded."
+            cat input.ts
             exit 1
           fi
+          echo "✅ Download successful."
 
       - name: Create HLS Chunks
         run: |
           mkdir -p output/${{ github.event.inputs.folder_name }}
-          ffmpeg -i input.mp4 -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
+          ffmpeg -i input.ts -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
 
       - name: Rename Extensions to .safetensors
         run: |
@@ -83,6 +90,22 @@ jobs:
       - name: Upload to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
           pip install huggingface_hub
-          python -c "import os; from huggingface_hub import HfApi; api = HfApi(token=os.environ['HF_TOKEN']); api.upload_folder(folder_path='output/${{ github.event.inputs.folder_name }}', repo_id='Sarko717227/Ai_SMART', repo_type='dataset', path_in_repo='${{ github.event.inputs.folder_name }}')"
+          
+          cat << 'EOF' > upload_script.py
+import os
+from huggingface_hub import HfApi
+
+api = HfApi(token=os.environ['HF_TOKEN'])
+folder = os.environ['FOLDER_NAME']
+
+api.upload_folder(
+    folder_path=f'output/{folder}',
+    repo_id='Sarko717227/Ai_SMART',
+    repo_type='dataset',
+    path_in_repo=folder
+)
+EOF
+          python3 upload_script.py
