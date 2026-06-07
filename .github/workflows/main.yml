@@ -14,15 +14,10 @@ jobs:
   convert_and_upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Free Disk Space (Ubuntu)
+      - name: Free Disk Space
         run: |
-          echo "گەران بەدوای فایلە زیادەکان و سڕینەوەیان بۆ چۆڵکردنی هارد..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
           sudo apt-get clean
-          df -h
 
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -57,35 +52,27 @@ jobs:
           else
             aria2c -x 4 -s 4 --max-connection-per-server=4 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
           fi
-          
-          SIZE=$(stat -c%s "input.video" 2>/dev/null || echo 0)
-          if [ "$SIZE" -lt 5000000 ]; then
-            echo "Error: Downloaded file is too small."
-            exit 1
-          fi
 
-      - name: Create HLS Chunks
-        run: |
-          mkdir -p output/${{ github.event.inputs.folder_name }}
-          # لێرەدا فەرمانە زۆرەملێیەکەمان لابرد بۆ ئەوەی mp4 بە ئاسانی بخوێنێتەوە
-          ffmpeg -probesize 100M -analyzeduration 100M -i input.video -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${{ github.event.inputs.folder_name }}/index%d.ts" output/${{ github.event.inputs.folder_name }}/index.m3u8
-
-      - name: Rename Extensions to .safetensors
-        run: |
-          cd output/${{ github.event.inputs.folder_name }}
-          for f in *.ts; do mv "$f" "${f%.ts}.safetensors"; done
-          mv index.m3u8 index.safetensors
-          sed -i 's/\.ts/\.safetensors/g' index.safetensors
-
-      - name: Upload to Hugging Face
+      - name: Convert, Rename, and Upload
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
-          pip install huggingface_hub
-          cat << 'EOF' > up.py
-          import os
-          from huggingface_hub import HfApi
-          api = HfApi(token=os.environ['HF_TOKEN'])
-          folder = os.environ['FOLDER_NAME']
-          api.upload_folder(folder_path=f'output/{folder}', repo_id='Sarko7172
+          mkdir -p output/${FOLDER_NAME}
+          
+          echo "🎥 Starting FFmpeg Conversion..."
+          ffmpeg -probesize 100M -analyzeduration 100M -i input.video -map 0:V:0 -map 0:a? -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 26 -g 60 -sc_threshold 0 -c:a aac -b:a 128k -hls_time 10 -hls_list_size 0 -hls_segment_filename "output/${FOLDER_NAME}/index%d.ts" output/${FOLDER_NAME}/index.m3u8
+          
+          echo "🔄 Renaming to .safetensors..."
+          cd output/${FOLDER_NAME}
+          for f in *.ts; do mv "$f" "${f%.ts}.safetensors"; done
+          mv index.m3u8 index.safetensors
+          sed -i 's/\.ts/\.safetensors/g' index.safetensors
+          cd ../..
+          
+          echo "📊 Checking files before upload:"
+          ls -lh output/${FOLDER_NAME} | head -n 10
+          
+          echo "🚀 Uploading to Hugging Face..."
+          pip install -U "huggingface_hub[cli]"
+          huggingface-cli upload Sarko717227/Ai_SMART output/${FOLDER_NAME} ${FOLDER_NAME} --repo-type dataset --token $HF_TOKEN
