@@ -33,6 +33,7 @@ jobs:
           URL=$(echo "$URL" | sed 's/ /%20/g')
           
           if [[ "$URL" == *"huggingface.co"* ]]; then
+            echo "📥 Hugging Face link detected..."
             pip install huggingface_hub
             echo "import os, sys" > dl.py
             echo "from huggingface_hub import hf_hub_download" >> dl.py
@@ -46,9 +47,14 @@ jobs:
             echo "os.rename(d, 'input.video')" >> dl.py
             python3 dl.py "$URL"
           elif [[ "$URL" == *".m3u8"* ]]; then
+            echo "📥 M3U8 link detected..."
             ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.video
-          else
+          elif [[ "$URL" == *"iwaatch.com"* ]]; then
+            echo "🐢 Slow server detected (iwaatch). Using 4 connections to prevent blocks..."
             aria2c -x 4 -s 4 --max-connection-per-server=4 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
+          else
+            echo "🚀 Fast server detected. Using 16 connections for maximum speed..."
+            aria2c -x 16 -s 16 --max-connection-per-server=16 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
           fi
 
       - name: Convert, Rename, and Upload
@@ -74,7 +80,6 @@ jobs:
           echo "🚀 Uploading to Hugging Face..."
           pip install -U huggingface_hub
           
-          # دروستکردنی فایلی ئەپڵۆدکردن بەبێ کێشەی بۆشایی و بێ بەکارهێنانی فەرمانی کۆن
           echo "import os" > up.py
           echo "from huggingface_hub import HfApi" >> up.py
           echo "api = HfApi(token=os.environ['HF_TOKEN'])" >> up.py
