@@ -48,12 +48,12 @@ jobs:
             python3 dl.py "$URL"
           elif [[ "$URL" == *".m3u8"* ]]; then
             echo "📥 M3U8 link detected..."
-            ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy input.video
+            # کێشەکە لێرەدا چارەسەر کرا بە زیادکردنی -f mpegts
+            ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy -f mpegts input.video
           elif [[ "$URL" == *"iwaatch.com"* ]]; then
             echo "🐢 Slow server detected (iwaatch). Using 4 connections..."
             aria2c -x 4 -s 4 --max-connection-per-server=4 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
           else
-            # گۆڕانکارییەکە لێرەدایە: ٨ هێڵ لەبری ١٦، لەگەڵ پشووی ٥ چرکە
             echo "⚖️ Balanced download. Using 8 connections for speed and safety..."
             aria2c -x 8 -s 8 --max-connection-per-server=8 --retry-wait=5 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
           fi
