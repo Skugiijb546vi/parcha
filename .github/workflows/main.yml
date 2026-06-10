@@ -57,7 +57,6 @@ jobs:
           elif [[ "$URL" == *"torrent"* || "$URL" == *"magnet:"* ]]; then
             echo "🧲 Torrent / Magnet system activated via Python libtorrent..."
             
-            # فێڵە گەورەکە: ئەگەر لینکی فایلی تۆرێنت بوو، خۆمان ڕاستەوخۆ لێرە دەیکەین بە ماگنێت بەبێ داونلۆدکردنی فایلی تێکچوو!
             if [[ "$URL" == *"http"* && "$URL" == *"torrent"* ]]; then
               echo "🔄 Extracting Hash from YTS link..."
               HASH=$(basename "$URL" | sed 's/\.torrent//g' | cut -d'?' -f1)
@@ -66,25 +65,24 @@ jobs:
               MAGNET_URL="$URL"
             fi
             
-            # دروستکردنی سکریپتی پایتۆن بە هێڵی ئاسایی و زیادکردنی تراکەری بەهێز
+            # دروستکردنی سکریپتەکە بە ڕێکخستنی تراکەری پێشوەختە بۆ ڕێگریکردن لە وەستان
             echo "import libtorrent as lt" > torrent_downloader.py
             echo "import time, sys, os" >> torrent_downloader.py
             echo "ses = lt.session()" >> torrent_downloader.py
-            echo "params = lt.add_torrent_params()" >> torrent_downloader.py
-            echo "params.save_path = '.'" >> torrent_downloader.py
+            echo "ses.listen_on(6881, 6891)" >> torrent_downloader.py
             echo "target = sys.argv[1]" >> torrent_downloader.py
-            echo "if target.startswith('magnet:'):" >> torrent_downloader.py
-            echo "    params.url = target" >> torrent_downloader.py
-            echo "    h = ses.add_torrent(params)" >> torrent_downloader.py
-            echo "    print('🧲 Connecting to Peers & Trackers...')" >> torrent_downloader.py
-            echo "    # زیادکردنی تراکەری خێرا بۆ ناو گیتھەب" >> torrent_downloader.py
-            echo "    trackers = ['udp://tracker.coppersurfer.tk:6969/announce', 'udp://tracker.openbittorrent.com:80/announce', 'udp://open.demonii.com:1337/announce', 'udp://tracker.leechers-paradise.org:6969/announce']" >> torrent_downloader.py
-            echo "    for t in trackers: h.add_tracker({'url': t})" >> torrent_downloader.py
-            echo "    while not h.has_metadata(): time.sleep(1)" >> torrent_downloader.py
-            echo "    print('✅ Metadata Obtained!')" >> torrent_downloader.py
-            echo "else:" >> torrent_downloader.py
-            echo "    info = lt.torrent_info(target)" >> torrent_downloader.py
-            echo "    h = ses.add_torrent({'ti': info, 'save_path': '.'})" >> torrent_downloader.py
+            echo "params = lt.parse_magnet_uri(target)" >> torrent_downloader.py
+            echo "params['save_path'] = '.' " >> torrent_downloader.py
+            echo "h = ses.add_torrent(params)" >> torrent_downloader.py
+            echo "print('🧲 Connecting to Trackers & Peers...')" >> torrent_downloader.py
+            echo "# زیادکردنی تراکەری ڕاستەوخۆ بۆ خێراکردنی ناسینەوەی مێتاداتا" >> torrent_downloader.py
+            echo "h.add_tracker({'url': 'udp://tracker.coppersurfer.tk:6969/announce'})" >> torrent_downloader.py
+            echo "h.add_tracker({'url': 'udp://tracker.openbittorrent.com:80/announce'})" >> torrent_downloader.py
+            echo "h.add_tracker({'url': 'udp://open.demonii.com:1337/announce'})" >> torrent_downloader.py
+            echo "while not h.status().has_metadata:" >> torrent_downloader.py
+            echo "    print('⏳ Waiting for Metadata...', flush=True)" >> torrent_downloader.py
+            echo "    time.sleep(5)" >> torrent_downloader.py
+            echo "print('✅ Metadata Obtained!')" >> torrent_downloader.py
             echo "print('🚀 Downloading Movie...')" >> torrent_downloader.py
             echo "while not h.status().is_seeding:" >> torrent_downloader.py
             echo "    s = h.status()" >> torrent_downloader.py
