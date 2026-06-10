@@ -23,7 +23,11 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg aria2 curl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg aria2 curl python3-pip
+          # دامەزراندنی لایبرەری فەرمی تۆرێنت بۆ پایتۆن
+          pip install --break-system-packages libtorrent
 
       - name: Download Video
         env:
@@ -52,21 +56,48 @@ jobs:
             ffmpeg -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -i "$URL" -c copy -f mpegts input.video
             
           elif [[ "$URL" == *"torrent"* || "$URL" == *"magnet:"* ]]; then
-            echo "🧲 Torrent / Magnet link detected..."
+            echo "🧲 Torrent / Magnet system activated via Python libtorrent..."
             
             if [[ "$URL" == *"http"* && "$URL" == *"torrent"* ]]; then
-              echo "📥 Downloading torrent file safely via Curl..."
-              curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$URL" -o file.torrent
-              
-              echo "🚀 Starting torrent download using official file flag..."
-              # بەکارهێنانی فەرمانی فەرمی بۆ خوێندنەوەی فایلی سەر هاردەکە بێ کێشەی ماگنێت
-              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 --torrent-file=file.torrent
+              echo "📥 Fetching torrent file..."
+              curl -L -A "Mozilla/5.0" "$URL" -o file.torrent
+              SOURCE_TORRENT="file.torrent"
             else
-              echo "🚀 Starting magnet link download..."
-              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 "$URL"
+              SOURCE_TORRENT="$URL"
             fi
             
-            # فێڵی پایتۆن بۆ دۆزینەوەی فیلمەکە
+            # دروستکردنی سکریپتی پایتۆن بۆ داونلۆدکردنی تۆرێنت بە خێرایی و نیشاندانی ڕێژە
+            cat << 'EOF' > torrent_downloader.py
+            import libtorrent as lt
+            import time
+            import sys
+            import os
+
+            ses = lt.session()
+            ses.listen_on(6881, 6891)
+            target = sys.argv[1]
+
+            if target.endswith('.torrent'):
+                info = lt.torrent_info(target)
+                h = ses.add_torrent({'ti': info, 'save_path': '.'})
+            else:
+                h = lt.add_magnet_uri(ses, target, {'save_path': '.'})
+                print("🧲 Downloading Metadata from Magnet Link...")
+                while not h.has_metadata():
+                    time.sleep(1)
+                print("✅ Metadata Obtained!")
+
+            print("🚀 Downloading Movie...")
+            while not h.status().is_seeding:
+                s = h.status()
+                print(f"📊 Progress: {s.progress * 100:.2f}% | DL Speed: {s.download_rate / 1000:.1f} kB/s | Peers: {s.num_peers}", flush=True)
+                time.sleep(10)
+            print("✅ Torrent Download Complete!")
+            EOF
+            
+            python3 torrent_downloader.py "$SOURCE_TORRENT"
+            
+            # دۆزینەوەی گەورەترین فایلی فیلمەکە و گۆڕینی بۆ input.video
             python3 -c "
             import os, glob
             files = [f for f in glob.glob('**/*', recursive=True) if os.path.isfile(f) and not f.endswith('.py') and not f.endswith('.yml') and not f.endswith('.torrent')]
@@ -74,8 +105,6 @@ jobs:
                 biggest = max(files, key=os.path.getsize)
                 print(f'🎬 Found movie file: {biggest}')
                 os.rename(biggest, 'input.video')
-            else:
-                print('❌ No file found!')
             "
             
           elif [[ "$URL" == *"iwaatch.com"* ]]; then
