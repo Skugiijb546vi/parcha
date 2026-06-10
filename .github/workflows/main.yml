@@ -26,7 +26,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg aria2 curl python3-pip
-          # دامەزراندنی لایبرەری فەرمی تۆرێنت بۆ پایتۆن
           pip install --break-system-packages libtorrent
 
       - name: Download Video
@@ -66,38 +65,30 @@ jobs:
               SOURCE_TORRENT="$URL"
             fi
             
-            # دروستکردنی سکریپتی پایتۆن بۆ داونلۆدکردنی تۆرێنت بە خێرایی و نیشاندانی ڕێژە
-            cat << 'EOF' > torrent_downloader.py
-            import libtorrent as lt
-            import time
-            import sys
-            import os
-
-            ses = lt.session()
-            ses.listen_on(6881, 6891)
-            target = sys.argv[1]
-
-            if target.endswith('.torrent'):
-                info = lt.torrent_info(target)
-                h = ses.add_torrent({'ti': info, 'save_path': '.'})
-            else:
-                h = lt.add_magnet_uri(ses, target, {'save_path': '.'})
-                print("🧲 Downloading Metadata from Magnet Link...")
-                while not h.has_metadata():
-                    time.sleep(1)
-                print("✅ Metadata Obtained!")
-
-            print("🚀 Downloading Movie...")
-            while not h.status().is_seeding:
-                s = h.status()
-                print(f"📊 Progress: {s.progress * 100:.2f}% | DL Speed: {s.download_rate / 1000:.1f} kB/s | Peers: {s.num_peers}", flush=True)
-                time.sleep(10)
-            print("✅ Torrent Download Complete!")
-            EOF
+            # لێرەدا فایلی پایتۆنەکە دێڕ بە دێڕ دروست دەکەین بەبێ بەکارهێنانی EOF بۆ ئەوەی هەرگیز ئێرۆر نەدات
+            echo "import libtorrent as lt" > torrent_downloader.py
+            echo "import time, sys, os" >> torrent_downloader.py
+            echo "ses = lt.session()" >> torrent_downloader.py
+            echo "ses.listen_on(6881, 6891)" >> torrent_downloader.py
+            echo "target = sys.argv[1]" >> torrent_downloader.py
+            echo "if target.endswith('.torrent'):" >> torrent_downloader.py
+            echo "    info = lt.torrent_info(target)" >> torrent_downloader.py
+            echo "    h = ses.add_torrent({'ti': info, 'save_path': '.'})" >> torrent_downloader.py
+            echo "else:" >> torrent_downloader.py
+            echo "    h = lt.add_magnet_uri(ses, target, {'save_path': '.'})" >> torrent_downloader.py
+            echo "    print('🧲 Downloading Metadata from Magnet Link...')" >> torrent_downloader.py
+            echo "    while not h.has_metadata(): time.sleep(1)" >> torrent_downloader.py
+            echo "    print('✅ Metadata Obtained!')" >> torrent_downloader.py
+            echo "print('🚀 Downloading Movie...')" >> torrent_downloader.py
+            echo "while not h.status().is_seeding:" >> torrent_downloader.py
+            echo "    s = h.status()" >> torrent_downloader.py
+            echo "    print(f'📊 Progress: {s.progress * 100:.2f}% | DL Speed: {s.download_rate / 1000:.1f} kB/s | Peers: {s.num_peers}', flush=True)" >> torrent_downloader.py
+            echo "    time.sleep(10)" >> torrent_downloader.py
+            echo "print('✅ Torrent Download Complete!')" >> torrent_downloader.py
             
             python3 torrent_downloader.py "$SOURCE_TORRENT"
             
-            # دۆزینەوەی گەورەترین فایلی فیلمەکە و گۆڕینی بۆ input.video
+            # فێڵی پایتۆن بۆ دۆزینەوەی فیلمەکە
             python3 -c "
             import os, glob
             files = [f for f in glob.glob('**/*', recursive=True) if os.path.isfile(f) and not f.endswith('.py') and not f.endswith('.yml') and not f.endswith('.torrent')]
