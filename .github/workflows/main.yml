@@ -58,12 +58,26 @@ jobs:
               echo "📥 Downloading torrent file safely..."
               curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$URL" -o file.torrent
               
-              # لێرەدا دەستکاریمان کردووە بۆ ئەوەی وەک فایلی ناوخۆیی بناسرێت
-              echo "🚀 Starting torrent download from local file..."
-              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 ./file.torrent
+              # فێڵە گەورەکە لێرەدایە: دەرهێنانی هاشەکە و دروستکردنی لینکی ماگنێت بە فەرمی
+              echo "🔄 Extracting Hash and creating Magnet Link..."
+              HASH=$(basename "$URL" | sed 's/\.torrent//g' | cut -d'?' -f1)
+              if [ ${#HASH} -eq 40 ]; then
+                MAGNET_URL="magnet:?xt=urn:btih:$HASH&tr=udp://tracker.coppersurfer.tk:6969/announce&tr=udp://tracker.openbittorrent.com:80/announce"
+                echo "🚀 Converted to Magnet Link successfully!"
+              else
+                # ئەگەر هاشەکە لە ناو لینکەکە نەبوو، ڕێگەی فەرمی فایلی aria2c بەکاردەهێنین
+                MAGNET_URL="./file.torrent"
+              fi
             else
-              echo "🚀 Starting magnet link download..."
-              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 "$URL"
+              MAGNET_URL="$URL"
+            fi
+            
+            echo "🚀 Starting torrent download..."
+            if [[ "$MAGNET_URL" == "./file.torrent" ]]; then
+              # فەرمانی ڕاستی لێرەدایە بۆ خوێندنەوەی فایلی سەر هارد بەبێ ئێرۆری پرۆتۆکۆڵ
+              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 --no-proxy=true "$MAGNET_URL"
+            else
+              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 "$MAGNET_URL"
             fi
             
             # فێڵی پایتۆن بۆ دۆزینەوەی فیلمەکە
