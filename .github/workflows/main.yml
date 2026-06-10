@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'Direct Video URL or M3U8'
+        description: 'Direct Video URL, M3U8, or Torrent'
         required: true
       folder_name:
         description: 'Folder Name English'
@@ -46,13 +46,30 @@ jobs:
             echo "d = hf_hub_download(repo_id=r, filename=f, repo_type=t, token=os.environ['HF_TOKEN'], local_dir='.')" >> dl.py
             echo "os.rename(d, 'input.video')" >> dl.py
             python3 dl.py "$URL"
+            
           elif [[ "$URL" == *".m3u8"* ]]; then
             echo "📥 M3U8 link detected..."
-            # کێشەکە لێرەدا چارەسەر کرا بە زیادکردنی -f mpegts
             ffmpeg -user_agent "Mozilla/5.0" -i "$URL" -c copy -f mpegts input.video
+            
+          elif [[ "$URL" == *"torrent"* || "$URL" == *"magnet:"* ]]; then
+            echo "🧲 Torrent / Magnet link detected..."
+            # دابەزاندنی تۆرێنت بەبێ لۆپبوون لە سیستەمی سیدینگدا
+            aria2c --seed-time=0 --summary-interval=15 "$URL"
+            
+            # فێڵی پایتۆن بۆ دۆزینەوەی گەورەترین فایل (فیلمەکە) و ناوگۆڕینی بۆ input.video
+            python3 -c "
+            import os, glob
+            files = [f for f in glob.glob('**/*', recursive=True) if os.path.isfile(f) and not f.endswith('.py') and not f.endswith('.yml')]
+            if files:
+                biggest = max(files, key=os.path.getsize)
+                print(f'🎬 Found movie file: {biggest}')
+                os.rename(biggest, 'input.video')
+            "
+            
           elif [[ "$URL" == *"iwaatch.com"* ]]; then
             echo "🐢 Slow server detected (iwaatch). Using 4 connections..."
             aria2c -x 4 -s 4 --max-connection-per-server=4 --retry-wait=3 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
+            
           else
             echo "⚖️ Balanced download. Using 8 connections for speed and safety..."
             aria2c -x 8 -s 8 --max-connection-per-server=8 --retry-wait=5 -k 1M -U "Mozilla/5.0" --header="Authorization: Bearer $HF_TOKEN" -d . -o input.video "$URL"
