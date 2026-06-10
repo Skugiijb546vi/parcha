@@ -54,17 +54,17 @@ jobs:
           elif [[ "$URL" == *"torrent"* || "$URL" == *"magnet:"* ]]; then
             echo "🧲 Torrent / Magnet link detected..."
             
-            # ئەگەر فایلی تۆرێنت بوو، سەرەتا بە کێرل وەک براوزەر دایدەبەزێنین بۆ ئەوەی بلۆک نەبێت
             if [[ "$URL" == *"http"* && "$URL" == *"torrent"* ]]; then
               echo "📥 Downloading torrent file safely..."
               curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$URL" -o file.torrent
-              TORRENT_TARGET="file.torrent"
+              
+              # لێرەدا دەستکاریمان کردووە بۆ ئەوەی وەک فایلی ناوخۆیی بناسرێت
+              echo "🚀 Starting torrent download from local file..."
+              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 ./file.torrent
             else
-              TORRENT_TARGET="$URL"
+              echo "🚀 Starting magnet link download..."
+              aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 "$URL"
             fi
-            
-            # لێرەدا تۆرێنتەکە یان ماگنێتەکە بە فەرمی دابەزێنە
-            aria2c --seed-time=0 --summary-interval=15 --bt-stop-timeout=300 "$TORRENT_TARGET"
             
             # فێڵی پایتۆن بۆ دۆزینەوەی فیلمەکە
             python3 -c "
